@@ -288,11 +288,11 @@ class TestDictHand1(unittest.TestCase):
         self.assertIsInstance(self.hand, MutableMapping)
 
     def test_all_keys_set(self):
-        excpected_keys = ['number', 'currency', 'hero_hole_cards', 'preflop_actions', 'parsed', 'turn', 'header_parsed',
-                          'show_down', 'poker_room', 'winners', 'board', 'limit', 'river_actions', 'hero',
-                          'turn_actions', 'bb', 'button_seat', 'tournament_ident', 'rake', 'buyin', 'game', 'hero_seat',
-                          'date', 'max_players', 'flop_actions', 'button', 'flop', 'game_type', 'players', 'table_name',
-                          'sb', 'total_pot', 'river', 'tournament_level']
+        excpected_keys = ['number', 'currency', 'hero_hole_cards', 'preflop_actions', 'ante', 'parsed', 'turn',
+                          'header_parsed', 'show_down', 'poker_room', 'winners', 'board', 'limit', 'river_actions',
+                          'hero', 'turn_actions', 'bb', 'button_seat', 'tournament_ident', 'rake', 'buyin', 'game',
+                          'hero_seat', 'date', 'max_players', 'flop_actions', 'button', 'flop', 'game_type', 'players',
+                          'table_name', 'sb', 'total_pot', 'river', 'tournament_level']
         self.assertListEqual(excpected_keys, self.hand.keys())
 
     def test_raw_is_not_a_key(self):
@@ -303,5 +303,5 @@ class TestDictHand1(unittest.TestCase):
         self.assertTrue(hasattr(self.hand, 'raw'))
 
     def test_there_should_be_not_only_one_but_thirtyfour_keys(self):
-        self.assertEqual(34, len(self.hand))
-        self.assertEqual(34, len(self.hand.keys()))
+        self.assertEqual(35, len(self.hand))
+        self.assertEqual(35, len(self.hand.keys()))

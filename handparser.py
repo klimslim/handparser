@@ -13,17 +13,10 @@ GAMES = {"Hold'em": 'HOLDEM'}
 LIMITS = {'No Limit': 'NL'}
 
 
-class _StringIONoNewLine(StringIO):
-    last_line = None
-
-    def readline(self, length=None):
-        return StringIO.readline(self, length=length).rstrip()
-
-
 class PokerStarsHand(MutableMapping):
     date_format = '%Y/%m/%d %H:%M:%S'
     _header_pattern = re.compile(r"""
-                                (?P<poker_room>PokerStars)[ ]           # Poker Room
+                                (?P<poker_room>^PokerStars)[ ]           # Poker Room
                                 Hand[ ]\#(?P<number>\d*):[ ]            # Hand number
                                 (?P<game_type>Tournament)[ ]            # Type
                                 \#(?P<tournament_ident>\d*),[ ]         # Tournament Number
@@ -36,19 +29,21 @@ class PokerStarsHand(MutableMapping):
                                 \((?P<sb>.*)/(?P<bb>.*)\)[ ]            # blinds
                                 -[ ].*[ ]                               # localized date
                                 \[(?P<date>.*)[ ]ET\]$                  # ET date
-                                """, re.VERBOSE)
-    _table_pattern = re.compile(r"Table '(.*)' (\d)-max Seat #(\d) is the button$")
-    _seat_pattern = re.compile(r"Seat (\d): (.*) \((\d*) in chips\)$")
-    _dealt_to_pattern = re.compile(r"Dealt to (.*) \[(.{2}) (.{2})\]$")
-    _pot_pattern = re.compile(r"Total pot (\d*) .*\| Rake (\d*)$")
-    _summary_winner_pattern = re.compile(r"Seat (\d): (.*) collected \((\d*)\)$")
-    _summary_showdown_pattern = re.compile(r"Seat (\d): (.*) showed .* and won")
-    _ante_pattern = re.compile(r".*posts the ante (\d*)")
-    _board_pattern = re.compile(r"(?<=[\[ ])(.{2})(?=[\] ])")
+                                """, re.VERBOSE | re.MULTILINE)
+    _table_pattern = re.compile(r"^Table '(.*)' (\d)-max Seat #(\d) is the button$", re.MULTILINE)
+    _seat_pattern = re.compile(r"^Seat (\d): (.*) \((\d*) in chips\)$", re.MULTILINE)
+    _preflop_pattern = re.compile(r"^Dealt to (\w*) \[(.{2}) (.{2})\](.*?)(?=\*{3})", re.MULTILINE | re.DOTALL)
+    _flop_pattern = re.compile(r"^\*\*\* FLOP \*\*\* \[.. .. ..\](.*?)\*\*\*", re.MULTILINE | re.DOTALL)
+    _turn_pattern = re.compile(r"^\*\*\* TURN \*\*\* \[.. .. ..\] \[..\](.*?)\*\*\*", re.MULTILINE | re.DOTALL)
+    _river_pattern = re.compile(r"^\*\*\* RIVER \*\*\* \[.. .. .. ..\] \[..\](.*?)\*\*\*", re.MULTILINE | re.DOTALL)
+    _board_pattern = re.compile(r"^Board \[(.*?)\]$", re.MULTILINE)
+    _pot_pattern = re.compile(r"^Total pot (\d*) .*\| Rake (\d*)$", re.MULTILINE)
+    _winner_pattern = re.compile(r"^(.*?) collected ", re.MULTILINE)
+    _summary_showdown_pattern = re.compile(r"^Seat (\d): (.*) showed .* and won.$", re.MULTILINE)
+    _ante_pattern = re.compile(r"posts the ante (\d*)", re.MULTILINE)
 
     def __init__(self, hand_text, parse=True):
-        self.raw = hand_text
-        self._hand = _StringIONoNewLine(hand_text.strip())
+        self.raw = hand_text.strip() + "\n"
         self.header_parsed, self.parsed = False, False
 
         if parse:
@@ -81,7 +76,7 @@ class PokerStarsHand(MutableMapping):
         """
         Parses the first line of a hand history.
         """
-        match = self._header_pattern.match(self._hand.readline())
+        match = self._header_pattern.search(self.raw)
         self.poker_room = POKER_ROOMS[match.group('poker_room')]
         self.game_type = TYPES[match.group('game_type')]
         self.sb = Decimal(match.group('sb'))
@@ -106,97 +101,77 @@ class PokerStarsHand(MutableMapping):
             self.parse_header()
 
         self._parse_table()
-        self._parse_players()
+        self._search_players()
+        self._search_ante()
         self._parse_preflop()
         self._parse_street('flop')
         self._parse_street('turn')
         self._parse_street('river')
-        self._parse_showdown()
-        self._parse_summary()
+        self._search_showdown()
+        self._search_board()
+        self._search_total_pot()
+        self._search_winners()
 
         self.parsed = True
 
     def _parse_table(self):
-        match = self._table_pattern.match(self._hand.readline())
+        match = self._table_pattern.search(self.raw)
         self.table_name = match.group(1)
         self.max_players = int(match.group(2))
         self.button_seat = int(match.group(3))
 
-    def _parse_players(self):
+    def _search_players(self):
         players = [('Empty Seat %s' % num, 0) for num in range(1, self.max_players + 1)]
-        for line in self._hand:
-            if not line.startswith('Seat'):
-                self._hand.last_line = line
-                break
-            match = self._seat_pattern.match(line)
-            players[int(match.group(1)) - 1] = (match.group(2), int(match.group(3)))
-        self.button = players[self.button_seat - 1][0]
+        for playerdata in self._seat_pattern.findall(self.raw):
+            players[int(playerdata[0]) - 1] = (playerdata[1], int(playerdata[2]))
         self.players = OrderedDict(players)
+        self.button = players[self.button_seat - 1][0]
+
+    def _search_ante(self):
+        match = self._ante_pattern.search(self.raw)
+        self.ante = int(match.group(1)) if match else None
 
     def _parse_preflop(self):
-        if 'ante' in self._hand.last_line:
-            match = self._ante_pattern.match(self._hand.last_line)
-            self.ante = int(match.group(1))
-
-        for line in self._hand:
-            if line.startswith('*** HOLE CARDS'):
-                break
-
-        match = self._dealt_to_pattern.match(self._hand.readline())
+        match = self._preflop_pattern.search(self.raw)
         self.hero = match.group(1)
-        self.hero_seat = self.players.keys().index(self.hero) + 1
         self.hero_hole_cards = match.group(2, 3)
-        self.preflop_actions = self._parse_actions()
+        self.preflop_actions = tuple(match.group(4).strip().splitlines())
+        self.hero_seat = self.players.keys().index(self.hero) + 1
 
     def _parse_street(self, street):
-        if "SUMMARY" in self._hand.last_line:
-            setattr(self, street, None)
-            setattr(self, '%s_actions' % street, None)
-            return
+        setattr(self, '%s_actions' % street, None)
+        street_pattern = getattr(self, "_%s_pattern" % street)
+        match = street_pattern.search(self.raw)
+        if match:
+            actions = match.group(1).strip()
+            actions = tuple(actions.splitlines()) if actions else None
+            setattr(self, '%s_actions' % street, actions)
 
-        try:
-            setattr(self, "%s_actions" % street, self._parse_actions())
-        except AttributeError:
-            setattr(self, street, None)
-
-    def _parse_showdown(self):
-        if "SHOW DOWN" in self._hand.last_line:
+    def _search_showdown(self):
+        self.show_down = False
+        if "SHOW DOWN" in self.raw:
             self.show_down = True
-            self._parse_actions()
-        else:
-            self.show_down = False
 
-    def _parse_summary(self):
-        match = self._pot_pattern.match(self._hand.readline())
+    def _search_total_pot(self):
+        match = self._pot_pattern.search(self.raw)
         self.total_pot = int(match.group(1))
 
-        self.board = None
-        boardline = self._hand.readline()
-        if boardline.startswith('Board'):
-            cards = self._board_pattern.findall(boardline)
+    def _search_board(self):
+        self.board = self.flop = self.turn = self.river = None
+        match = self._board_pattern.search(self.raw)
+        if match:
+            cards = match.group(1).split()
             self.board = tuple(cards)
-            self.flop = tuple(cards[:3]) if cards else None
+            self.flop = tuple(cards[:3])
             self.turn = cards[3] if len(cards) > 3 else None
             self.river = cards[4] if len(cards) > 4 else None
 
+    def _search_winners(self):
         winners = set()
-        for line in self._hand:
-            if not self.show_down and "collected" in line:
-                match = self._summary_winner_pattern.match(line)
-                winners.add(match.group(2))
-            elif self.show_down and "won" in line:
-                match = self._summary_showdown_pattern.match(line)
-                winners.add(match.group(2))
-
+        match = self._winner_pattern.search(self.raw)
+        if match:
+            winners.add(match.group(1))
+        match = self._summary_showdown_pattern.search(self.raw)
+        if match:
+            winners.add(match.group(1))
         self.winners = tuple(winners)
-
-    def _parse_actions(self):
-        actions = []
-        for line in self._hand:
-            if line.startswith("***"):
-                self._hand.last_line = line
-                break
-            actions.append(line)
-        else:
-            return
-        return tuple(actions) if actions else None
