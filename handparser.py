@@ -120,16 +120,24 @@ class PokerStarsHand(MutableMapping):
             raise KeyError('You can only get it via the attribute like "hand.%s"' % key)
 
     def __setitem__(self, key, value):
-        self.raw = None
-        self.header_parsed = False
-        self.parsed = False
-        setattr(self, key, value)
+        self.__setattr__(key, value)
 
     def __delitem__(self, key):
-        self.raw = None
-        self.header_parsed = False
-        self.parsed = False
-        delattr(self, key)
+        self.__delattr__(key)
+
+    def __setattr__(self, name, value):
+        if getattr(self, 'parsed', False) and name not in ('raw', 'header_parsed', 'parsed'):
+            super(PokerStarsHand, self).__setattr__('raw', None)
+            super(PokerStarsHand, self).__setattr__('header_parsed', False)
+            super(PokerStarsHand, self).__setattr__('parsed', False)
+        super(PokerStarsHand, self).__setattr__(name, value)
+
+    def __delattr__(self, key):
+        if getattr(self, 'parsed', False) and key not in ('raw', 'header_parsed', 'parsed'):
+            self.raw = None
+            self.header_parsed = False
+            self.parsed = False
+        super(PokerStarsHand, self).__delattr__(key)
 
     def keys(self):
         return [attr for attr in vars(self) if not attr.startswith('_') and attr not in self._non_hand_attributes]
