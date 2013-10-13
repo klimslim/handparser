@@ -38,3 +38,8 @@
 
     Single results average: 42.623277545
     Repeated results average: 41.5501109759
+
+#### With dict behavior
+
+    Single results average: 38.7412737608
+    Repeated results average: 38.577022016
