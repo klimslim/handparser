@@ -21,11 +21,27 @@ ET = pytz.timezone('US/Eastern')
 UTC = pytz.UTC
 CET = pytz.timezone('Europe/Budapest')
 
-POKER_ROOMS = {'PokerStars': 'STARS', 'Full Tilt Poker': 'FTP', 'PKR': 'PKR'}
-TYPES = {'Tournament': 'TOUR', 'RING': 'CASH', 'Cash Game': 'CASH'}
-GAMES = {"Hold'em": 'HOLDEM', "HOLD'EM": 'HOLDEM', 'OMAHA': 'OMAHA'}
-LIMITS = {'No Limit': 'NL', 'NO LIMIT': 'NL', 'NL': 'NL', 'PL': 'PL', 'Pot Limit': 'PL', 'POT LIMIT': 'PL'}
-MONEY_TYPES = {'REAL MONEY': 'R', 'PLAY_MONEY': 'P'}
+
+_POKER_ROOMS = {'STARS': {'pokerstars', 'stars', 'ps'},
+                'FTP': {'full tilt poker', 'full tilt', 'ftp'},
+                'PKR': {'pkr'}}
+_TYPES = {'TOUR': {'tournament', 'tour'},
+          'CASH': {'ring', 'cash game', 'cash'}}
+_GAMES = {'HOLDEM': {"hold'em", 'holdem'},
+          'OMAHA': {'omaha'}}
+_LIMITS = {'NL': {'no limit', 'nl'},
+           'PL': {'pot limit', 'pl'}}
+_MONEY_TYPES = {'R': {'REAL MONEY'},
+                'P': {'PLAY MONEY'}}
+
+
+def normalize(value):
+    val = value.lower()
+    for dataset in (_POKER_ROOMS, _TYPES, _GAMES, _LIMITS, _MONEY_TYPES):
+        for normalized, compare in dataset.iteritems():
+            if val in compare:
+                return normalized
+    return value.upper()
 
 
 class PokerHand(MutableMapping):
