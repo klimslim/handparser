@@ -21,11 +21,51 @@ ET = pytz.timezone('US/Eastern')
 UTC = pytz.UTC
 CET = pytz.timezone('Europe/Budapest')
 
-POKER_ROOMS = {'PokerStars': 'STARS', 'Full Tilt Poker': 'FTP', 'PKR': 'PKR'}
-TYPES = {'Tournament': 'TOUR', 'RING': 'CASH', 'Cash Game': 'CASH'}
-GAMES = {"Hold'em": 'HOLDEM', "HOLD'EM": 'HOLDEM', 'OMAHA': 'OMAHA'}
-LIMITS = {'No Limit': 'NL', 'NO LIMIT': 'NL', 'NL': 'NL', 'PL': 'PL', 'Pot Limit': 'PL', 'POT LIMIT': 'PL'}
-MONEY_TYPES = {'REAL MONEY': 'R', 'PLAY_MONEY': 'P'}
+
+def normalize_room(room):
+    val = room.lower()
+    if val in {'stars', 'pokerstars', 'ps'}:
+        return 'STARS'
+    elif val in {'ftp', 'full tilt', 'fulltilt', 'full tilt poker', 'fulltiltpoker'}:
+        return 'FTP'
+    elif val in {'pkr', 'pkr poker'}:
+        return 'PKR'
+
+
+def normalize_game_type(game_type):
+    val = game_type.lower()
+    if val in {'ring', 'cash game', 'cash'}:
+        return 'CASH'
+    elif val in {'tournament', 'tour'}:
+        return 'TOUR'
+
+
+def normalize_game(game):
+    val = game.lower()
+    if val in {"hold'em", 'holdem'}:
+        return 'HOLDEM'
+    elif val in {'omaha'}:
+        return 'OMAHA'
+
+
+def normalize_limit(limit):
+    value = limit.lower()
+    if value in {'no limit', 'nl'}:
+        return 'NL'
+    elif value in {'pot limit', 'pl'}:
+        return 'PL'
+    elif value in {'fix limit', 'fl'}:
+        return 'FL'
+
+
+def normalize_money_type(money_type):
+    value = money_type.lower()
+    if value in {'real money'}:
+        return 'R'
+    elif value in {'play money'}:
+        return 'P'
+    else:
+        return value.upper()
 
 
 class PokerHand(MutableMapping):
