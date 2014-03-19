@@ -184,8 +184,8 @@ class PokerStarsHand(PokerHand):
     date_format = '%Y/%m/%d %H:%M:%S ET'
     _time_zone = pytz.timezone('US/Eastern')  # ET
 
-    _split_re = re.compile(r" ?\*\*\* ?\n?|\n")
-    _header_re = re.compile(r"""
+    _SPLIT_RE = re.compile(r" ?\*\*\* ?\n?|\n")
+    _HEADER_RE = re.compile(r"""
                         ^PokerStars[ ]                          # Poker Room
                         Hand[ ]\#(?P<ident>\d*):[ ]             # Hand number
                         (?P<game_type>Tournament)[ ]            # Type
@@ -200,19 +200,19 @@ class PokerStarsHand(PokerHand):
                         -[ ].*[ ]                               # localized date
                         \[(?P<date>.*)\]$                       # ET date
                         """, re.VERBOSE)
-    _table_re = re.compile(r"^Table '(.*)' (\d)-max Seat #(\d) is the button$")
-    _seat_re = re.compile(r"^Seat (\d): (.*) \((\d*) in chips\)$")
-    _hole_cards_re = re.compile(r"^Dealt to (.*) \[(..) (..)\]$")
-    _pot_re = re.compile(r"^Total pot (\d*) .*\| Rake (\d*)$")
-    _winner_re = re.compile(r"^Seat (\d): (.*) collected \((\d*)\)$")
-    _showdown_re = re.compile(r"^Seat (\d): (.*) showed .* and won")
-    _ante_re = re.compile(r".*posts the ante (\d*)")
-    _board_re = re.compile(r"(?<=[\[ ])(..)(?=[\] ])")
+    _TABLE_RE = re.compile(r"^Table '(.*)' (\d)-max Seat #(\d) is the button$")
+    _SEAT_RE = re.compile(r"^Seat (\d): (.*) \((\d*) in chips\)$")
+    _HOLE_CARDS_RE = re.compile(r"^Dealt to (.*) \[(..) (..)\]$")
+    _POT_RE = re.compile(r"^Total pot (\d*) .*\| Rake (\d*)$")
+    _WINNER_RE = re.compile(r"^Seat (\d): (.*) collected \((\d*)\)$")
+    _SHOWDOWN_RE = re.compile(r"^Seat (\d): (.*) showed .* and won")
+    _ANTE_RE = re.compile(r".*posts the ante (\d*)")
+    _BOARD_RE = re.compile(r"(?<=[\[ ])(..)(?=[\] ])")
 
     def __init__(self, hand_text, parse=True):
         """Split hand history by sections and parse."""
         super(PokerStarsHand, self).__init__(hand_text, parse)
-        self._splitted = self._split_re.split(self.raw)
+        self._splitted = self._SPLIT_RE.split(self.raw)
 
         # search split locations (basically empty strings)
         # sections[0] is before HOLE CARDS
@@ -223,7 +223,7 @@ class PokerStarsHand(PokerHand):
             self.parse()
 
     def parse_header(self):
-        match = self._header_re.match(self._splitted[0])
+        match = self._HEADER_RE.match(self._splitted[0])
         self.game_type = normalize(match.group('game_type'))
         self.sb = Decimal(match.group('sb'))
         self.bb = Decimal(match.group('bb'))
@@ -256,7 +256,7 @@ class PokerStarsHand(PokerHand):
         self.parsed = True
 
     def _parse_table(self):
-        match = self._table_re.match(self._splitted[1])
+        match = self._TABLE_RE.match(self._splitted[1])
         self.table_name = match.group(1)
         self.max_players = int(match.group(2))
         self.button_seat = int(match.group(3))
@@ -264,7 +264,7 @@ class PokerStarsHand(PokerHand):
     def _parse_seats(self):
         players = self._init_seats(self.max_players)
         for line in self._splitted[2:]:
-            match = self._seat_re.match(line)
+            match = self._SEAT_RE.match(line)
             if not match:
                 break
             players[int(match.group(1)) - 1] = (match.group(2), int(match.group(3)))
@@ -274,7 +274,7 @@ class PokerStarsHand(PokerHand):
 
     def _parse_hole_cards(self):
         hole_cards_line = self._splitted[self._sections[0] + 2]
-        match = self._hole_cards_re.match(hole_cards_line)
+        match = self._HOLE_CARDS_RE.match(hole_cards_line)
         self.hero = match.group(1)
         self.hero_seat = self.players.keys().index(self.hero) + 1
         self.hero_hole_cards = match.group(2, 3)
@@ -296,14 +296,14 @@ class PokerStarsHand(PokerHand):
 
     def _parse_pot(self):
         potline = self._splitted[self._sections[-1] + 2]
-        match = self._pot_re.match(potline)
+        match = self._POT_RE.match(potline)
         self.total_pot = int(match.group(1))
 
     def _parse_board(self):
         boardline = self._splitted[self._sections[-1] + 3]
         if not boardline.startswith('Board'):
             return
-        cards = self._board_re.findall(boardline)
+        cards = self._BOARD_RE.findall(boardline)
         self.flop = tuple(cards[:3]) if cards else None
         self.turn = cards[3] if len(cards) > 3 else None
         self.river = cards[4] if len(cards) > 4 else None
@@ -313,10 +313,10 @@ class PokerStarsHand(PokerHand):
         start = self._sections[-1] + 4
         for line in self._splitted[start:]:
             if not self.show_down and "collected" in line:
-                match = self._winner_re.match(line)
+                match = self._WINNER_RE.match(line)
                 winners.add(match.group(2))
             elif self.show_down and "won" in line:
-                match = self._showdown_re.match(line)
+                match = self._SHOWDOWN_RE.match(line)
                 winners.add(match.group(2))
 
         self.winners = tuple(winners)
@@ -352,32 +352,32 @@ class FullTiltHand(PokerHand):
     date_format = '%H:%M:%S ET - %Y/%m/%d'
     _time_zone = pytz.timezone('US/Eastern')  # ET
 
-    _split_re = re.compile(r" ?\*\*\* ?\n?|\n")
+    _SPLIT_RE = re.compile(r" ?\*\*\* ?\n?|\n")
 
     # header patterns
-    _tournament_re = re.compile(r"""
+    _TOURNAMENT_RE = re.compile(r"""
                         ^Full[ ]Tilt[ ]Poker[ ]                 # Poker Room
                         Game[ ]\#(?P<ident>\d*):[ ]             # Hand number
                         (?P<tournament_name>.*)[ ]              # Tournament name
                         \((?P<tournament_ident>\d*)\),[ ]       # Tournament Number
                         Table[ ](?P<table_name>\d*)[ ]-[ ]      # Table name
                         """, re.VERBOSE)
-    _game_re = re.compile(r" - (?P<limit>NL|PL|FL|No Limit|Pot Limit|Fix Limit) (?P<game>.*?) - ")
-    _blind_re = re.compile(r" - (\d*)/(\d*) - ")
-    _date_re = re.compile(r" \[(.*)\]$")
+    _GAME_RE = re.compile(r" - (?P<limit>NL|PL|FL|No Limit|Pot Limit|Fix Limit) (?P<game>.*?) - ")
+    _BLIND_RE = re.compile(r" - (\d*)/(\d*) - ")
+    _DATE_RE = re.compile(r" \[(.*)\]$")
 
-    _seat_re = re.compile(r"^Seat (\d): (.*) \(([\d,]*)\)$")
-    _button_re = re.compile(r"^The button is in seat #(\d)$")
-    _hole_cards_re = re.compile(r"^Dealt to (.*) \[(..) (..)\]$")
-    _street_re = re.compile(r"\[([^\]]*)\] \(Total Pot: (\d*)\, (\d) Players")
-    _pot_re = re.compile(r"^Total pot ([\d,]*) .*\| Rake (\d*)$")
-    _winner_re = re.compile(r"^Seat (\d): (.*) collected \((\d*)\),")
-    _showdown_re = re.compile(r"^Seat (\d): (.*) showed .* and won")
+    _SEAT_RE = re.compile(r"^Seat (\d): (.*) \(([\d,]*)\)$")
+    _BUTTON_RE = re.compile(r"^The button is in seat #(\d)$")
+    _HOLE_CARDS_RE = re.compile(r"^Dealt to (.*) \[(..) (..)\]$")
+    _STREET_RE = re.compile(r"\[([^\]]*)\] \(Total Pot: (\d*)\, (\d) Players")
+    _POT_RE = re.compile(r"^Total pot ([\d,]*) .*\| Rake (\d*)$")
+    _WINNER_RE = re.compile(r"^Seat (\d): (.*) collected \((\d*)\),")
+    _SHOWDOWN_RE = re.compile(r"^Seat (\d): (.*) showed .* and won")
 
     def __init__(self, hand_text, parse=True):
         super(FullTiltHand, self).__init__(hand_text, parse)
 
-        self._splitted = self._split_re.split(self.raw)
+        self._splitted = self._SPLIT_RE.split(self.raw)
 
         # search split locations (basically empty strings)
         # sections[0] is before HOLE CARDS
@@ -390,22 +390,22 @@ class FullTiltHand(PokerHand):
     def parse_header(self):
         header_line = self._splitted[0]
 
-        match = self._tournament_re.match(header_line)
+        match = self._TOURNAMENT_RE.match(header_line)
         self.game_type = 'TOUR'
         self.ident = match.group('ident')
         self.tournament_name = match.group('tournament_name')
         self.tournament_ident = match.group('tournament_ident')
         self.table_name = match.group('table_name')
 
-        match = self._game_re.search(header_line)
+        match = self._GAME_RE.search(header_line)
         self.limit = normalize(match.group('limit'))
         self.game = normalize(match.group('game'))
 
-        match = self._blind_re.search(header_line)
+        match = self._BLIND_RE.search(header_line)
         self.sb = Decimal(match.group(1))
         self.bb = Decimal(match.group(2))
 
-        match = self._date_re.search(header_line)
+        match = self._DATE_RE.search(header_line)
         self._parse_date(match.group(1))
 
         self.tournament_level = self.buyin = self.rake = self.currency = None
@@ -431,7 +431,7 @@ class FullTiltHand(PokerHand):
         # In hh there is no indication of max_players, so init for 9.
         players = self._init_seats(9)
         for line in self._splitted[1:]:
-            match = self._seat_re.match(line)
+            match = self._SEAT_RE.match(line)
             if not match:
                 break
             seat_number = int(match.group(1))
@@ -443,12 +443,12 @@ class FullTiltHand(PokerHand):
 
         # one line before the first split.
         button_line = self._splitted[self._sections[0] - 1]
-        self.button_seat = int(self._button_re.match(button_line).group(1))
+        self.button_seat = int(self._BUTTON_RE.match(button_line).group(1))
         self.button = players[self.button_seat - 1][0]
 
     def _parse_hole_cards(self):
         hole_cards_line = self._splitted[self._sections[0] + 2]
-        match = self._hole_cards_re.match(hole_cards_line)
+        match = self._HOLE_CARDS_RE.match(hole_cards_line)
         self.hero = match.group(1)
         self.hero_seat = self.players.keys().index(self.hero) + 1
         self.hero_hole_cards = match.group(2, 3)
@@ -476,7 +476,7 @@ class FullTiltHand(PokerHand):
         # Exceptions caught in _parse_street.
         board_line = self._splitted[start]
 
-        match = self._street_re.search(board_line)
+        match = self._STREET_RE.search(board_line)
         cards = match.group(1)
         cards = tuple(cards.split()) if street == 'flop' else cards
         setattr(self, street, cards)
@@ -489,7 +489,7 @@ class FullTiltHand(PokerHand):
 
     def _parse_pot(self):
         potline = self._splitted[self._sections[-1] + 2]
-        match = self._pot_re.match(potline.replace(',', ''))
+        match = self._POT_RE.match(potline.replace(',', ''))
         self.total_pot = int(match.group(1))
 
     def _parse_winners(self):
@@ -497,10 +497,10 @@ class FullTiltHand(PokerHand):
         start = self._sections[-1] + 4
         for line in self._splitted[start:]:
             if not self.show_down and "collected" in line:
-                match = self._winner_re.match(line)
+                match = self._WINNER_RE.match(line)
                 winners.add(match.group(2))
             elif self.show_down and "won" in line:
-                match = self._showdown_re.match(line)
+                match = self._SHOWDOWN_RE.match(line)
                 winners.add(match.group(2))
 
         self.winners = tuple(winners)
@@ -525,21 +525,21 @@ class PKRHand(PokerHand):
     currency = 'USD'
     _time_zone = pytz.UTC
 
-    _split_re = re.compile(r"Dealing |\nDealing Cards\n|Taking |Moving |\n")
-    _blinds_re = re.compile(r"^Blinds are now \$([\d.]*) / \$([\d.]*)$")
-    _dealt_re = re.compile(r"^\[(. .)\]\[(. .)\] to (.*)$")
-    _seat_re = re.compile(r"^Seat (\d\d?): (.*) - \$([\d.]*) ?(.*)$")
-    _sizes_re = re.compile(r"^Pot sizes: \$([\d.]*)$")
-    _card_re = re.compile(r"\[(. .)\]")
-    _rake_re = re.compile(r"Rake of \$([\d.]*) from pot \d$")
-    _win_re = re.compile(r"^(.*) wins \$([\d.]*) with: ")
-    SPLIT_CARD_SPACE = slice(0, 3, 2)
+    _SPLIT_RE = re.compile(r"Dealing |\nDealing Cards\n|Taking |Moving |\n")
+    _BLINDS_RE = re.compile(r"^Blinds are now \$([\d.]*) / \$([\d.]*)$")
+    _DEALT_RE = re.compile(r"^\[(. .)\]\[(. .)\] to (.*)$")
+    _SEAT_RE = re.compile(r"^Seat (\d\d?): (.*) - \$([\d.]*) ?(.*)$")
+    _SIZES_RE = re.compile(r"^Pot sizes: \$([\d.]*)$")
+    _CARD_RE = re.compile(r"\[(. .)\]")
+    _RAKE_RE = re.compile(r"Rake of \$([\d.]*) from pot \d$")
+    _WIN_RE = re.compile(r"^(.*) wins \$([\d.]*) with: ")
+    _SPLIT_CARD_SPACE = slice(0, 3, 2)
 
     def __init__(self, hand_text, parse=True):
         """Split hand history by sections and parse."""
         super(PKRHand, self).__init__(hand_text, parse)
 
-        self._splitted = self._split_re.split(self.raw)
+        self._splitted = self._SPLIT_RE.split(self.raw)
 
         # search split locations (basically empty strings)
         # sections[1] is after blinds, before preflop
@@ -560,7 +560,7 @@ class PKRHand(PokerHand):
         self.game_type = normalize(self._splitted[6][12:])   # cut off "Table Type: "
         self.money_type = normalize(self._splitted[7][12:])  # cut off "Money Type: "
 
-        match = self._blinds_re.match(self._splitted[8])
+        match = self._BLINDS_RE.match(self._splitted[8])
         self.sb = Decimal(match.group(1))
         self.bb = Decimal(match.group(2))
         self.buyin = self.bb * 100
@@ -587,7 +587,7 @@ class PKRHand(PokerHand):
         # so init for 10, as there are 10 player tables on PKR.
         players = self._init_seats(10)
         for line in self._splitted[10:]:
-            match = self._seat_re.match(line)
+            match = self._SEAT_RE.match(line)
             if not match:
                 break
             seat_number = int(match.group(1))
@@ -607,10 +607,10 @@ class PKRHand(PokerHand):
 
     def _parse_hero(self):
         dealt_row = self._splitted[self._sections[1] + 1]
-        match = self._dealt_re.match(dealt_row)
+        match = self._DEALT_RE.match(dealt_row)
 
-        first = match.group(1)[self.SPLIT_CARD_SPACE]
-        second = match.group(2)[self.SPLIT_CARD_SPACE]
+        first = match.group(1)[self._SPLIT_CARD_SPACE]
+        second = match.group(2)[self._SPLIT_CARD_SPACE]
         self.hero_hole_cards = (first, second)
 
         self.hero = match.group(3)
@@ -628,14 +628,14 @@ class PKRHand(PokerHand):
             start = self._sections[section] + 1
 
             street_line = self._splitted[start]
-            cards = map(lambda x: x[self.SPLIT_CARD_SPACE], self._card_re.findall(street_line))
+            cards = map(lambda x: x[self._SPLIT_CARD_SPACE], self._CARD_RE.findall(street_line))
             setattr(self, street, tuple(cards) if street == 'flop' else cards[0])
 
             stop = next(v for v in self._sections if v > start) - 1
             setattr(self, "%s_actions" % street, tuple(self._splitted[start + 1:stop]))
 
             sizes_line = self._splitted[start - 2]
-            pot = Decimal(self._sizes_re.match(sizes_line).group(1))
+            pot = Decimal(self._SIZES_RE.match(sizes_line).group(1))
             setattr(self, "%s_pot" % street, pot)
         except IndexError:
             setattr(self, street, None)
@@ -646,7 +646,7 @@ class PKRHand(PokerHand):
         start = self._sections[-1] + 1
 
         rake_line = self._splitted[start]
-        match = self._rake_re.match(rake_line)
+        match = self._RAKE_RE.match(rake_line)
         self.rake = Decimal(match.group(1))
 
         winners = []
@@ -655,7 +655,7 @@ class PKRHand(PokerHand):
             if 'shows' in line:
                 self.show_down = True
             elif 'wins' in line:
-                match = self._win_re.match(line)
+                match = self._WIN_RE.match(line)
                 winners.append(match.group(1))
                 total_pot += Decimal(match.group(2))
 
